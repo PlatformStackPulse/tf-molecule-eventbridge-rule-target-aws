@@ -1,6 +1,15 @@
 # tf-molecule-eventbridge-rule-target-aws
 
-EventBridge rule with target for event-driven architectures.
+Composes an Amazon EventBridge rule and its target into a single, event-driven building block for serverless and event-driven architectures.
+
+## Features
+
+- Wires a tf-atom EventBridge **rule** to a tf-atom EventBridge **target** in one module, with the target automatically bound to the created rule.
+- Supports both **event-pattern** rules and **scheduled** rules (`schedule_expression`, e.g. `rate(1 hour)` / `cron(...)`).
+- Custom **event bus** support via `event_bus_name` (defaults to `default`).
+- Target delivery controls: static `input` / `input_path`, IAM `role_arn`, dead-letter queue (`dead_letter_arn`), and retry policy (`maximum_retry_attempts`, `maximum_event_age_in_seconds`).
+- Toggle the rule between `ENABLED` / `DISABLED` (`rule_state`) and disable the whole module with `enabled = false`.
+- Standard [tf-label](https://github.com/PlatformStackPulse/tf-label) naming/tagging context (`namespace`, `environment`, `stage`, `name`, `tags`, …).
 
 ## Usage
 
@@ -12,12 +21,14 @@ module "event_rule" {
   environment = "prod"
   name        = "order-processor"
 
+  # Required: the resource EventBridge delivers matched events to
+  target_arn = module.lambda.function_arn
+
+  # Match events (or use schedule_expression for scheduled rules)
   event_pattern = jsonencode({
     source      = ["aws.s3"]
     detail-type = ["Object Created"]
   })
-
-  target_arn = module.lambda.function_arn
 }
 ```
 
@@ -87,3 +98,18 @@ No resources.
 | <a name="output_rule_arn"></a> [rule\_arn](#output\_rule\_arn) | ARN of the EventBridge rule |
 | <a name="output_rule_name"></a> [rule\_name](#output\_rule\_name) | Name of the EventBridge rule |
 <!-- END_TF_DOCS -->
+
+## Tests
+
+Unit tests use the native `terraform test` framework with a mocked AWS provider, so
+they run without credentials and make no real AWS calls. Assertions target
+plan-known values (the tf-label `id` and input pass-throughs).
+
+```bash
+# Unit tests (mocked provider — no AWS credentials required)
+terraform init -backend=false
+terraform test -test-directory=tests/unit
+
+# Or via the Makefile
+make test-unit
+```
